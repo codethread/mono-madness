@@ -1,0 +1,4 @@
+export const yarnrc = `
+# yarnPath: .yarn/releases/yarn-3.3.1.cjs
+nodeLinker: node-modules
+`;
