@@ -17,8 +17,14 @@ export const generateTsconfig = (include: string[]) => {
 
 export function funcTemplate(name: string): string {
   return `
-export function ${name}() {
-  return 1 + 2
+export function ${name}(str: string) {
+    const s = (
+        Number(str.charAt(0).toUpperCase() + str.slice(1))
+        .toString()
+        .slice(0, 3) ?? "0"
+    );
+    const f = s.replace(/[^0-9]/g, "");
+    return Number(f).toString();
 }
 `;
 }
