@@ -1,7 +1,7 @@
 import path from "path";
 import fs from "fs-extra";
 import { genPackageJson, genRootPackageJson } from "./pj";
-import { generateTsconfig, tsFileContents } from "./tsc";
+import { generateTsconfig, generateTsFiles, tsFileContents } from "./tsc";
 import { exec } from "child_process";
 import { yarnrc } from "./yarn";
 import { rimraf } from "rimraf";
@@ -25,86 +25,89 @@ const target = t.replace("~", process.env["HOME"] ?? "");
 
 (async () => {
   console.log("running");
+  console.log("removing old files");
   await rimraf(target);
-  const workspaces = ["a", "b", "c"];
 
-  const packageA = genPackageJson({
-    name: "a",
-    workspacesDependencies: ["b", "c"],
+  // generate workspaces
+  const workspaces = ["a", "b", "c"] as const;
+  type WorkspaceKey = (typeof workspaces)[number];
+  const workspaceDependencies: Partial<Record<WorkspaceKey, string[]>> = {
+    a: ["b", "c"],
+    b: ["c"],
+  };
+
+  const workspaceFiles = workspaces.map((workspace) => {
+    const packageJson = genPackageJson({
+      name: workspace,
+      workspacesDependencies: workspaceDependencies[workspace] ?? [],
+      build: true,
+    });
+    const tsconfig = generateTsconfig(["src"]);
+
+    const names = generateNames(`${workspace}_`, size);
+    const tsFiles = generateTsFiles(names, 20);
+    // const tsFiles: [string, string][] = [
+    //   ["index.ts", tsFileContents(generateNames(`${workspace}_`, size))],
+    // ];
+    return {
+      name: workspace,
+      packageJson,
+      tsconfig,
+      tsFiles,
+    };
   });
-  const tsconfigA = generateTsconfig(["src"]);
-  const tsFileA = tsFileContents(generateNames("a_", size));
 
-  const packageB = genPackageJson({
-    name: "b",
-    workspacesDependencies: ["c"],
-    build: true,
-  });
-  const tsconfigB = generateTsconfig(["src"]);
-  const tsFileB = tsFileContents(generateNames("b_", size));
-
-  const packageC = genPackageJson({ name: "c", build: true });
-  const tsconfigC = generateTsconfig(["src"]);
-  const tsFileC = tsFileContents(generateNames("c_", size));
-
-  const rootPackageJson = genRootPackageJson({ workspaces });
-
+  // create directories for all workspaces
   await Promise.all(
     workspaces.map((workspace) =>
       fs.ensureDir(path.join(target, "packages", workspace, "src"))
     )
   );
 
+  // generate root files for project
   await Promise.all([
-    // write rootPackageJson to target
-    fs.writeJson(path.join(target, "package.json"), rootPackageJson),
-    // write rootTsconfig to target
+    fs.writeJson(
+      path.join(target, "package.json"),
+      genRootPackageJson({ workspaces })
+    ),
     fs.writeJson(path.join(target, "tsconfig.json"), {}),
-    // write node gitignore to target
     fs.writeFile(path.join(target, ".gitignore"), "node_modules\ndist"),
-    // write yarnrc to target
     fs.writeFile(path.join(target, ".yarnrc.yml"), yarnrc),
-
-    // write packageA to target/packages/a
-    fs.writeJson(path.join(target, "packages", "a", "package.json"), packageA),
-    fs.writeJson(path.join(target, "packages", "b", "package.json"), packageB),
-    fs.writeJson(path.join(target, "packages", "c", "package.json"), packageC),
-
-    // write tsconfigA to target/packages/a
-    fs.writeJson(
-      path.join(target, "packages", "a", "tsconfig.json"),
-      tsconfigA
-    ),
-    fs.writeJson(
-      path.join(target, "packages", "b", "tsconfig.json"),
-      tsconfigB
-    ),
-    fs.writeJson(
-      path.join(target, "packages", "c", "tsconfig.json"),
-      tsconfigC
-    ),
-
-    // write tsFileA to target/packages/a/src/index.ts
-    fs.writeFile(
-      path.join(target, "packages", "a", "src", "index.ts"),
-      tsFileA
-    ),
-    fs.writeFile(
-      path.join(target, "packages", "b", "src", "index.ts"),
-      tsFileB
-    ),
-    fs.writeFile(
-      path.join(target, "packages", "c", "src", "index.ts"),
-      tsFileC
-    ),
   ]);
+
+  await Promise.all(
+    workspaceFiles.flatMap(async (workspaceFile) => {
+      const { packageJson, tsconfig, tsFiles, name } = workspaceFile;
+
+      const tsFileWriters = tsFiles.map(async ([filename, contents]) => {
+        return fs.writeFile(
+          path.join(target, "packages", name, "src", filename),
+          contents
+        );
+      });
+
+      return Promise.all(
+        tsFileWriters.concat([
+          fs.writeJson(
+            path.join(target, "packages", name, "package.json"),
+            packageJson
+          ),
+
+          fs.writeJson(
+            path.join(target, "packages", name, "tsconfig.json"),
+            tsconfig
+          ),
+        ])
+      );
+    })
+  );
 
   const commands = [
     "git init",
     "yarn",
     "yarn plugin import workspace-tools",
-    "echo $PWD",
-    "code .",
+    "echo generated to: $PWD",
+    // "code .",
   ];
 
   asyncForEach(

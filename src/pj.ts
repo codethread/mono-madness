@@ -1,11 +1,13 @@
 interface PJRoot {
-  workspaces: string[];
+  workspaces: readonly string[];
 }
 export const genRootPackageJson = (info: PJRoot) => ({
   name: "root",
   private: true,
   scripts: {
     build: "yarn workspaces foreach -pt run build",
+    clean: "git clean -dfX && yarn",
+    cleanBuild: "yarn clean && yarn build",
   },
   workspaces: info.workspaces.map((workspace) => `packages/${workspace}`),
   packageManager: "yarn@3.3.1",
@@ -18,7 +20,7 @@ export const genRootPackageJson = (info: PJRoot) => ({
 interface PJ {
   name: string;
   build?: boolean;
-  workspacesDependencies?: string[];
+  workspacesDependencies?: readonly string[];
   dependencies?: string[];
 }
 export const genPackageJson = (info: PJ) => ({
