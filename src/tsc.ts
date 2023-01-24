@@ -56,10 +56,17 @@ export const generateTsFiles = (names: string[], count: number) => {
   return files.concat([["index.ts", indexFile]]);
 };
 
-function chunk<A>(array: readonly A[], size: number): A[][] {
+// split an array evenly across n arrays
+function chunk<A>(arrary: readonly A[], n: number): A[][] {
   const chunks: A[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunks.push(array.slice(i, i + size));
+  for (let i = 0; i < n; i++) {
+    chunks.push([]);
   }
+
+  for (let i = 0; i < arrary.length; i++) {
+    const chunk = chunks[i % n];
+    chunk!.push(arrary[i] as any);
+  }
+
   return chunks;
 }

@@ -1,29 +1,20 @@
 import path from "path";
 import fs from "fs-extra";
 import { genPackageJson, genRootPackageJson } from "./pj";
-import { generateTsconfig, generateTsFiles, tsFileContents } from "./tsc";
-import { exec } from "child_process";
+import { generateTsconfig, generateTsFiles } from "./tsc";
 import { yarnrc } from "./yarn";
 import { rimraf } from "rimraf";
+import { asyncExec, generateNames, thousand } from "./helpers";
 
-const size = 10000;
-function replaceAllNonLetters(str: string) {
-  return str.replace(/[^a-zA-Z]/g, "");
-}
-const generateNames = (prefix: string, size: number): string[] => {
-  const names = [];
-  for (let i = 0; i < size; i++) {
-    names.push(
-      prefix + replaceAllNonLetters(Math.random().toString(36).substring(2, 25))
-    );
-  }
-  return names;
+const config = {
+  projectLocation: "~/dev/projects/generated",
+  functionCount: thousand(50),
+  fileCount: 2000,
 };
 
-const t = "~/dev/projects/generated";
-const target = t.replace("~", process.env["HOME"] ?? "");
-
 (async () => {
+  const { functionCount, projectLocation, fileCount } = config;
+  const target = projectLocation.replace("~", process.env["HOME"] ?? "");
   console.log("running");
   console.log("removing old files");
   await rimraf(target);
@@ -31,7 +22,8 @@ const target = t.replace("~", process.env["HOME"] ?? "");
   // generate workspaces
   const workspaces = ["a", "b", "c"] as const;
   type WorkspaceKey = (typeof workspaces)[number];
-  const workspaceDependencies: Partial<Record<WorkspaceKey, string[]>> = {
+  type Deps = Partial<Record<WorkspaceKey, string[]>>;
+  const workspaceDependencies: Deps = {
     a: ["b", "c"],
     b: ["c"],
   };
@@ -44,11 +36,8 @@ const target = t.replace("~", process.env["HOME"] ?? "");
     });
     const tsconfig = generateTsconfig(["src"]);
 
-    const names = generateNames(`${workspace}_`, size);
-    const tsFiles = generateTsFiles(names, 20);
-    // const tsFiles: [string, string][] = [
-    //   ["index.ts", tsFileContents(generateNames(`${workspace}_`, size))],
-    // ];
+    const names = generateNames(`${workspace}_`, functionCount);
+    const tsFiles = generateTsFiles(names, fileCount);
     return {
       name: workspace,
       packageJson,
@@ -107,36 +96,10 @@ const target = t.replace("~", process.env["HOME"] ?? "");
     "yarn",
     "yarn plugin import workspace-tools",
     "echo generated to: $PWD",
-    // "code .",
   ];
 
-  asyncForEach(
-    commands.map(
-      (command) => () =>
-        asyncExec(command, target).then(({ stdout, stderr }) => {
-          console.log(stdout, stderr);
-        })
-    )
-  );
-})();
-
-async function asyncForEach(
-  promises: Array<() => Promise<any>>
-): Promise<void> {
-  for (let i = 0; i < promises.length; i++) {
-    await promises[i]!();
+  for await (const command of commands) {
+    const { stdout, stderr } = await asyncExec(command, target);
+    console.log(stdout, stderr);
   }
-}
-function asyncExec(
-  command: string,
-  target: string
-): Promise<{ stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    exec(command, { cwd: target }, (error, stdout, stderr) => {
-      if (error) {
-        reject(error);
-      }
-      resolve({ stdout, stderr });
-    });
-  });
-}
+})();
