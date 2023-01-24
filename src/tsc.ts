@@ -1,17 +1,39 @@
 import { basename } from "path";
 
-export const generateTsconfig = (include: string[]) => {
+export const generateRootTsconfig = ({
+  composite,
+}: {
+  composite?: boolean;
+}) => {
   return {
     compilerOptions: {
       target: "es5",
       module: "commonjs",
       strict: true,
       esModuleInterop: true,
+      declaration: true,
+      ...(composite ? { composite: true } : {}),
+    },
+  };
+};
+export const generateTsconfig = ({
+  include,
+  peers,
+}: {
+  include: string[];
+  peers?: string[];
+}) => {
+  return {
+    extends: "../../tsconfig.json",
+    compilerOptions: {
       outDir: "dist",
       rootDir: "src",
-      declaration: true,
+      ...(peers ? { composite: true } : {}),
     },
-    include,
+    include: include,
+    ...(peers
+      ? { references: peers.map((peer) => ({ path: `../${peer}` })) }
+      : {}),
   };
 };
 

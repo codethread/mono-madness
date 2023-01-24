@@ -1,7 +1,7 @@
 import path from "path";
 import fs from "fs-extra";
 import { genPackageJson, genRootPackageJson } from "./pj";
-import { generateTsconfig, generateTsFiles } from "./tsc";
+import { generateRootTsconfig, generateTsconfig, generateTsFiles } from "./tsc";
 import { yarnrc } from "./yarn";
 import { rimraf } from "rimraf";
 import { asyncExec, generateNames, thousand } from "./helpers";
@@ -10,10 +10,11 @@ const config = {
   projectLocation: "~/dev/projects/generated",
   functionCount: thousand(50),
   fileCount: 2000,
+  composite: false,
 };
 
 (async () => {
-  const { functionCount, projectLocation, fileCount } = config;
+  const { functionCount, projectLocation, fileCount, composite } = config;
   const target = projectLocation.replace("~", process.env["HOME"] ?? "");
   console.log("running");
   console.log("removing old files");
@@ -29,12 +30,13 @@ const config = {
   };
 
   const workspaceFiles = workspaces.map((workspace) => {
+    const peers = workspaceDependencies[workspace] ?? [];
     const packageJson = genPackageJson({
       name: workspace,
-      workspacesDependencies: workspaceDependencies[workspace] ?? [],
+      workspacesDependencies: peers,
       build: true,
     });
-    const tsconfig = generateTsconfig(["src"]);
+    const tsconfig = generateTsconfig({ include: ["src"], peers: peers });
 
     const names = generateNames(`${workspace}_`, functionCount);
     const tsFiles = generateTsFiles(names, fileCount);
@@ -59,7 +61,10 @@ const config = {
       path.join(target, "package.json"),
       genRootPackageJson({ workspaces })
     ),
-    fs.writeJson(path.join(target, "tsconfig.json"), {}),
+    fs.writeJson(
+      path.join(target, "tsconfig.json"),
+      generateRootTsconfig({ composite })
+    ),
     fs.writeFile(path.join(target, ".gitignore"), "node_modules\ndist"),
     fs.writeFile(path.join(target, ".yarnrc.yml"), yarnrc),
   ]);
