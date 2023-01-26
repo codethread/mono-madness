@@ -16,6 +16,18 @@ export const generateRootTsconfig = ({
     },
   };
 };
+
+export const generateProjectTsconfig = ({
+  peers,
+}: {
+  peers: readonly string[];
+}) => ({
+  extends: "../tsconfig.json",
+  files: [],
+  includes: [],
+  references: peers.map((peer) => ({ path: `./${peer}` })),
+});
+
 export const generateTsconfig = ({
   include,
   peers,
@@ -28,7 +40,6 @@ export const generateTsconfig = ({
     compilerOptions: {
       outDir: "dist",
       rootDir: "src",
-      ...(peers ? { composite: true } : {}),
     },
     include: include,
     ...(peers

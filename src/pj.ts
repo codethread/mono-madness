@@ -1,10 +1,12 @@
 interface PJRoot {
   workspaces: readonly string[];
+  composite?: boolean;
 }
 export const genRootPackageJson = (info: PJRoot) => ({
   name: "root",
   private: true,
   scripts: {
+    ...(info.composite ? { ts: "cd packages && tsc -b" } : {}),
     build: "yarn workspaces foreach -pt run build",
     clean: "git clean -dfX && yarn",
     cleanBuild: "yarn clean && yarn build",
@@ -14,6 +16,9 @@ export const genRootPackageJson = (info: PJRoot) => ({
   volta: {
     node: "18.13.0",
     yarn: "3.3.1",
+  },
+  devDependencies: {
+    typescript: "^4.9.4",
   },
 });
 
