@@ -7,6 +7,7 @@ export const genRootPackageJson = (info: PJRoot) => ({
   private: true,
   scripts: {
     ...(info.composite ? { ts: "cd packages && tsc -b" } : {}),
+    dev: "yarn workspace a run ts-node 'src/index.ts'",
     build: "yarn workspaces foreach -pt run build",
     clean: "git clean -dfX && yarn",
     cleanBuild: "yarn clean && yarn build",
@@ -19,6 +20,7 @@ export const genRootPackageJson = (info: PJRoot) => ({
   },
   devDependencies: {
     typescript: "^4.9.4",
+    prettier: "^2.5.1",
   },
 });
 
@@ -31,7 +33,14 @@ interface PJ {
 export const genPackageJson = (info: PJ) => ({
   name: info.name,
   version: "1.0.0",
-  ...(info.build && { main: "dist/index.js", types: "dist/index.d.ts" }),
+  main: "src/index.ts",
+  ...(info.build && { types: "dist/index.d.ts" }),
+  exports: {
+    ".": {
+      default: "./src/index.ts",
+    },
+    "./package.json": "./package.json",
+  },
   scripts: {
     test: 'echo "Error: no test specified" && exit 1',
     ...(info.build && { build: "tsc" }),

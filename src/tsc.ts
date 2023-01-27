@@ -12,7 +12,12 @@ export const generateRootTsconfig = ({
       strict: true,
       esModuleInterop: true,
       declaration: true,
-      ...(composite ? { composite: true } : {}),
+      declarationMap: true,
+      emitDeclarationOnly: true,
+      stripInternal: true,
+      ...(composite
+        ? { composite: true, disableSourceOfProjectReferenceRedirect: true }
+        : {}),
     },
   };
 };
@@ -48,9 +53,17 @@ export const generateTsconfig = ({
   };
 };
 
-export function funcTemplate(name: string): string {
-  return `
-export function ${name}(str: string) {
+interface CodeConfig {
+  size: "small" | "medium" | "large";
+  internal: boolean;
+  name: string;
+  exported: boolean;
+  returnType: boolean;
+}
+
+const code = {
+  small: "return 'hello'",
+  medium: `
     const s = (
         Number(str.charAt(0).toUpperCase() + str.slice(1))
         .toString()
@@ -58,30 +71,70 @@ export function ${name}(str: string) {
     );
     const f = s.replace(/[^0-9]/g, "");
     return Number(f).toString();
+`,
+  large: `TBC`,
+};
+export function funcTemplate({
+  name,
+  size,
+  exported,
+  internal,
+  returnType,
+}: CodeConfig): string {
+  return `
+${internal ? "/** @internal */" : ""}
+${exported ? "export " : ""}function ${name}(str: string)${
+    returnType ? ": string" : ""
+  } {
+  ${code[size]}
 }
 `;
 }
 
-export const tsFileContents = (names: string[]) =>
-  names.map((name) => funcTemplate(name)).join("\n");
+export const tsFileContents = (configs: CodeConfig[]) =>
+  configs.map((config) => funcTemplate(config)).join("\n");
 
 export const indexFileContents = (names: string[], filename: string) =>
-  names
-    .map((name) => `export { ${name} } from "./${basename(filename, ".ts")}"`)
-    .join("\n");
+  `export { ${names.join(",\n")} } from "./${basename(filename, ".ts")}"`;
 
 // split names into count chunks and write each chunk to a file where each name is a function
 // all functions will be exported
 // an index file will also be generated that imports all functions and exports them
-export const generateTsFiles = (names: string[], count: number) => {
+export const generateTsFiles = (
+  names: string[],
+  count: number,
+  exportCount?: number
+) => {
+  const exportsCount = exportCount ?? names.length;
   let indexFile = "";
   const chunks = chunk(names, count);
+  const chunkLength = chunks.length;
+  const numOfExportsPerChunk = Math.floor(exportsCount / chunkLength) || 1;
   const files: [string, string][] = [];
+
   chunks.forEach((chunk, index) => {
     const fileName = `index${index}.ts`;
-    const fileContents = tsFileContents(chunk);
+    const exportedChunk = chunk.slice(0, numOfExportsPerChunk);
+    const nonExportedChunk = chunk.slice(numOfExportsPerChunk);
 
-    indexFile += "\n" + indexFileContents(chunk, fileName);
+    const fileContents = tsFileContents([
+      ...exportedChunk.map((name) => ({
+        name,
+        exported: true,
+        internal: false,
+        returnType: true,
+        size: "small" as const,
+      })),
+      ...nonExportedChunk.map((name) => ({
+        name,
+        exported: false,
+        internal: true,
+        returnType: true,
+        size: "small" as const,
+      })),
+    ]);
+
+    indexFile += "\n" + indexFileContents(exportedChunk, fileName);
 
     files.push([fileName, fileContents]);
   });

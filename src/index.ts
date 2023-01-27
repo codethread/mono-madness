@@ -10,13 +10,18 @@ import {
 import { yarnrc } from "./yarn";
 import { rimraf } from "rimraf";
 import { asyncExec, generateNames, thousand } from "./helpers";
-import { workspaces, workspaceDependencies, Workspace } from "./workspaces";
+import * as WKS from "./workspaces";
+
+type Workspace = WKS.ComplexWorkspace;
+const workspaces = WKS.complexWorkspaces;
+const workspaceDependencies = WKS.complexWorkspaceDependencies;
 
 const config = {
-  projectLocation: "~/dev/projects/generated",
-  functionCount: thousand(10),
-  fileCount: 100,
-  composite: true,
+  projectLocation: "~/dev/projects/gen/large-nocomp",
+  functionCount: thousand(50),
+  exportCount: 1000,
+  fileCount: 1000,
+  composite: false,
 };
 type Config = typeof config;
 
@@ -49,6 +54,8 @@ type Config = typeof config;
     "git init",
     "yarn",
     "yarn plugin import workspace-tools",
+    "yarn prettier --write --ignore-path=.gitignore .",
+    "yarn workspace a add ts-node @types/node",
     "echo generated to: $PWD",
   ];
 
@@ -57,6 +64,10 @@ type Config = typeof config;
     console.log(stdout, stderr);
   }
 })();
+
+// ======================================================================
+// HELPERS
+// ======================================================================
 
 async function createRootFiles({
   workspaces,
@@ -129,18 +140,23 @@ interface WorkspaceFiles {
   tsFiles: [string, string][];
 }
 
-function generateWorkspaceFiles({ functionCount, fileCount }: Config) {
+function generateWorkspaceFiles({
+  functionCount,
+  fileCount,
+  exportCount,
+  composite,
+}: Config) {
   return (workspace: Workspace): WorkspaceFiles => {
     const peers = workspaceDependencies[workspace] ?? [];
     const packageJson = genPackageJson({
       name: workspace,
       workspacesDependencies: peers,
-      build: true,
+      build: composite,
     });
     const tsconfig = generateTsconfig({ include: ["src"], peers: peers });
 
     const names = generateNames(`${workspace}_`, functionCount);
-    const tsFiles = generateTsFiles(names, fileCount);
+    const tsFiles = generateTsFiles(names, fileCount, exportCount);
     return {
       name: workspace,
       packageJson,
