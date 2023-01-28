@@ -7,7 +7,8 @@ export const generateRootTsconfig = ({
 }) => {
   return {
     compilerOptions: {
-      target: "es5",
+      target: "ESNext",
+      lib: ["ESNext"],
       module: "commonjs",
       strict: true,
       esModuleInterop: true,
@@ -72,7 +73,21 @@ const code = {
     const f = s.replace(/[^0-9]/g, "");
     return Number(f).toString();
 `,
-  large: `TBC`,
+  large: `
+    const letter = String.fromCharCode(97 + Math.floor(Math.random() * 26))
+    switch (letter) {
+        case "a": return "a";
+        case "b": return "b";
+        case "c": return "c";
+        case "d": return "d";
+        case "e": return "e";
+        case "f": return "f";
+        case "g": return "g";
+        case "h": return "h";
+        case "i": return "i";
+        default: return "j";
+    }
+`,
 };
 export function funcTemplate({
   name,
@@ -103,9 +118,10 @@ export const indexFileContents = (names: string[], filename: string) =>
 export const generateTsFiles = (
   names: string[],
   count: number,
-  exportCount?: number
+  exportCount: number,
+  config: Pick<CodeConfig, "returnType" | "size">
 ) => {
-  const exportsCount = exportCount ?? names.length;
+  const exportsCount = exportCount;
   let indexFile = "";
   const chunks = chunk(names, count);
   const chunkLength = chunks.length;
@@ -119,18 +135,16 @@ export const generateTsFiles = (
 
     const fileContents = tsFileContents([
       ...exportedChunk.map((name) => ({
+        ...config,
         name,
         exported: true,
         internal: false,
-        returnType: true,
-        size: "small" as const,
       })),
       ...nonExportedChunk.map((name) => ({
+        ...config,
         name,
         exported: false,
         internal: true,
-        returnType: true,
-        size: "small" as const,
       })),
     ]);
 

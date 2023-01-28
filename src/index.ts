@@ -16,12 +16,28 @@ type Workspace = WKS.ComplexWorkspace;
 const workspaces = WKS.complexWorkspaces;
 const workspaceDependencies = WKS.complexWorkspaceDependencies;
 
-const config = {
-  projectLocation: "~/dev/projects/gen/large-nocomp",
+// i think this is so big that i likely need to give lsp more memory
+// can investigate more on vscode
+// when using compositie with builds, it saves the editor parsing more than one
+// project till i open it, which is nice
+const configSoBigINeedsComp = {
+  projectLocation: "~/dev/projects/gen/large",
   functionCount: thousand(50),
-  exportCount: 1000,
+  exportCount: 100,
   fileCount: 1000,
-  composite: false,
+  composite: true,
+  returnTypes: false, // interesting, this did not seem to matter
+  functionSize: "large" as const,
+};
+
+const config = {
+  projectLocation: "~/dev/projects/gen/large-return",
+  functionCount: thousand(50),
+  exportCount: 100,
+  fileCount: 1000,
+  composite: true,
+  returnTypes: true,
+  functionSize: "large" as const,
 };
 type Config = typeof config;
 
@@ -54,7 +70,7 @@ type Config = typeof config;
     "git init",
     "yarn",
     "yarn plugin import workspace-tools",
-    "yarn prettier --write --ignore-path=.gitignore .",
+    // "yarn prettier --write --ignore-path=.gitignore .",
     "yarn workspace a add ts-node @types/node",
     "echo generated to: $PWD",
   ];
@@ -141,10 +157,11 @@ interface WorkspaceFiles {
 }
 
 function generateWorkspaceFiles({
+  composite,
+  exportCount,
   functionCount,
   fileCount,
-  exportCount,
-  composite,
+  ...config
 }: Config) {
   return (workspace: Workspace): WorkspaceFiles => {
     const peers = workspaceDependencies[workspace] ?? [];
@@ -156,7 +173,10 @@ function generateWorkspaceFiles({
     const tsconfig = generateTsconfig({ include: ["src"], peers: peers });
 
     const names = generateNames(`${workspace}_`, functionCount);
-    const tsFiles = generateTsFiles(names, fileCount, exportCount);
+    const tsFiles = generateTsFiles(names, fileCount, exportCount, {
+      size: config.functionSize,
+      returnType: config.returnTypes,
+    });
     return {
       name: workspace,
       packageJson,
