@@ -1,58 +1,5 @@
 import { basename } from "path";
-
-export const generateRootTsconfig = ({
-  composite,
-}: {
-  composite?: boolean;
-}) => {
-  return {
-    compilerOptions: {
-      target: "ESNext",
-      lib: ["ESNext"],
-      module: "commonjs",
-      strict: true,
-      esModuleInterop: true,
-      declaration: true,
-      declarationMap: true,
-      emitDeclarationOnly: true,
-      stripInternal: true,
-      ...(composite
-        ? { composite: true, disableSourceOfProjectReferenceRedirect: true }
-        : {}),
-    },
-  };
-};
-
-export const generateProjectTsconfig = ({
-  peers,
-}: {
-  peers: readonly string[];
-}) => ({
-  extends: "../tsconfig.json",
-  files: [],
-  includes: [],
-  references: peers.map((peer) => ({ path: `./${peer}` })),
-});
-
-export const generateTsconfig = ({
-  include,
-  peers,
-}: {
-  include: string[];
-  peers?: string[];
-}) => {
-  return {
-    extends: "../../tsconfig.json",
-    compilerOptions: {
-      outDir: "dist",
-      rootDir: "src",
-    },
-    include: include,
-    ...(peers
-      ? { references: peers.map((peer) => ({ path: `../${peer}` })) }
-      : {}),
-  };
-};
+import type { Config } from "../../shared";
 
 interface CodeConfig {
   size: "small" | "medium" | "large";
@@ -117,13 +64,11 @@ export const indexFileContents = (names: string[], filename: string) =>
 // an index file will also be generated that imports all functions and exports them
 export const generateTsFiles = (
   names: string[],
-  count: number,
-  exportCount: number,
-  config: Pick<CodeConfig, "returnType" | "size">
+  config: Config
 ) => {
-  const exportsCount = exportCount;
+  const exportsCount = config.exportCount
   let indexFile = "";
-  const chunks = chunk(names, count);
+  const chunks = chunk(names, config.fileCount);
   const chunkLength = chunks.length;
   const numOfExportsPerChunk = Math.floor(exportsCount / chunkLength) || 1;
   const files: [string, string][] = [];
@@ -132,20 +77,21 @@ export const generateTsFiles = (
     const fileName = `index${index}.ts`;
     const exportedChunk = chunk.slice(0, numOfExportsPerChunk);
     const nonExportedChunk = chunk.slice(numOfExportsPerChunk);
+        const common: Omit<CodeConfig, 'name'>   = { 
+            size: config.functionSize,
+            returnType: config.returnTypes,
+            exported: true,
+            internal: false
+        }
 
     const fileContents = tsFileContents([
       ...exportedChunk.map((name) => ({
-        ...config,
-        name,
-        exported: true,
-        internal: false,
+                ...common,
+                name,
       })),
-      ...nonExportedChunk.map((name) => ({
-        ...config,
-        name,
-        exported: false,
-        internal: true,
-      })),
+      ...nonExportedChunk.map((name) => ({ ...common, name, 
+        internal: config.useInternal,
+            })),
     ]);
 
     indexFile += "\n" + indexFileContents(exportedChunk, fileName);

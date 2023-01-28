@@ -20,7 +20,7 @@ export const complexWorkspaces = [
   "t",
 ] as const;
 
-export type ComplexWorkspace = Key<typeof complexWorkspaces>;
+type ComplexWorkspace = Key<typeof complexWorkspaces>;
 export const complexWorkspaceDependencies: Deps<ComplexWorkspace> = {
   a: ["b", "c", "e", "i"],
   b: ["c"],
@@ -30,7 +30,8 @@ export const complexWorkspaceDependencies: Deps<ComplexWorkspace> = {
 };
 
 export const simpleWorkspace = ["a", "b"];
-export type SimpleWorkspace = Key<typeof simpleWorkspace>;
+type SimpleWorkspace = Key<typeof simpleWorkspace>;
 export const simpleWorkspaceDependencies: Deps<SimpleWorkspace> = {
   a: ["b"],
 };
+

@@ -8,7 +8,7 @@ export const genRootPackageJson = (info: PJRoot) => ({
   scripts: {
     ...(info.composite ? { ts: "cd packages && tsc -b" } : {}),
     dev: "yarn workspace a run ts-node 'src/index.ts'",
-    build: "yarn workspaces foreach -pt run build",
+    build: "tsc -b --verbose packages/tsconfig.json",
     clean: "git clean -dfX && yarn",
     cleanBuild: "yarn clean && yarn build",
   },
@@ -43,7 +43,10 @@ export const genPackageJson = (info: PJ) => ({
   },
   scripts: {
     test: 'echo "Error: no test specified" && exit 1',
-    ...(info.build && { build: "tsc" }),
+    ...(info.build && { 
+            build: "tsc -b --verbose" ,
+            watch: "yarn build --watch" ,
+        }),
   },
   dependencies: {
     typescript: "^4.9.4",
